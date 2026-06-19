@@ -1,0 +1,44 @@
+package com.apptasticsoftware.rssreader.module.psc.internal;
+
+import com.apptasticsoftware.rssreader.DateTimeParser;
+import com.apptasticsoftware.rssreader.internal.ItemImpl;
+import com.apptasticsoftware.rssreader.module.psc.PscChannel;
+import com.apptasticsoftware.rssreader.module.psc.PscItem;
+import com.apptasticsoftware.rssreader.module.psc.PscItemData;
+
+import java.util.Objects;
+
+public class PscItemImpl extends ItemImpl implements PscItem, PscItemDataProvider {
+    private final PscItemData pscData = new PscItemDataImpl();
+
+    public PscItemImpl(DateTimeParser dateTimeParser) {
+        super(dateTimeParser);
+    }
+
+    @Override
+    public PscChannel getChannel() {
+        var channel = super.getChannel();
+        if (channel instanceof PscChannel) {
+            return (PscChannel) channel;
+        }
+        return null;
+    }
+
+    @Override
+    public PscItemData pscItemData() {
+        return pscData;
+    }
+
+    @Override
+    public boolean equals(Object o) {
+        if (!(o instanceof PscItemImpl)) return false;
+        if (!super.equals(o)) return false;
+        PscItemImpl pscItem = (PscItemImpl) o;
+        return Objects.equals(pscData, pscItem.pscData);
+    }
+
+    @Override
+    public int hashCode() {
+        return Objects.hash(super.hashCode(), pscData);
+    }
+}
