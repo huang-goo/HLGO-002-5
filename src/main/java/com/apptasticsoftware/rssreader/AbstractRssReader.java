@@ -35,6 +35,9 @@ import javax.xml.stream.XMLStreamException;
 import javax.xml.stream.XMLStreamReader;
 import java.io.*;
 import java.lang.ref.Cleaner;
+import java.net.InetSocketAddress;
+import java.net.PasswordAuthentication;
+import java.net.ProxySelector;
 import java.net.URI;
 import java.net.http.HttpClient;
 import java.net.http.HttpRequest;
@@ -77,6 +80,7 @@ public abstract class AbstractRssReader<C extends Channel, I extends Item> {
     private Duration connectionTimeout = Duration.ofSeconds(25);
     private Duration requestTimeout = Duration.ofSeconds(25);
     private Duration readTimeout = Duration.ofSeconds(25);
+    private ProxyConfig proxyConfig;
     private final Map<String, String> headers = new HashMap<>();
     protected final HashMap<String, Consumer<C>> onChannelTags = new HashMap<>();
     private final HashMap<String, BiConsumer<C, String>> channelTags = new HashMap<>();
@@ -397,6 +401,20 @@ public abstract class AbstractRssReader<C extends Channel, I extends Item> {
     public AbstractRssReader<C, I> setReadTimeout(Duration readTimeout) {
         validate(readTimeout, "Read timeout");
         this.readTimeout = readTimeout;
+        return this;
+    }
+
+    /**
+     * Sets the proxy configuration for the http client.
+     * Supports HTTP/HTTPS proxy with optional authentication.
+     * The proxy configuration must be set before the http client is created,
+     * i.e. before calling any read method.
+     *
+     * @param proxyConfig the proxy configuration, or null to disable proxy
+     * @return updated RSSReader
+     */
+    public AbstractRssReader<C, I> setProxyConfig(ProxyConfig proxyConfig) {
+        this.proxyConfig = proxyConfig;
         return this;
     }
 
@@ -965,6 +983,7 @@ public abstract class AbstractRssReader<C extends Channel, I extends Item> {
             if (connectionTimeout.toMillis() > 0) {
                 builder.connectTimeout(connectionTimeout);
             }
+            applyProxyConfig(builder);
             client = builder.build();
         } catch (NoSuchAlgorithmException | KeyManagementException e) {
             var builder = HttpClient.newBuilder()
@@ -972,9 +991,31 @@ public abstract class AbstractRssReader<C extends Channel, I extends Item> {
             if (connectionTimeout.toMillis() > 0) {
                 builder.connectTimeout(connectionTimeout);
             }
+            applyProxyConfig(builder);
             client = builder.build();
         }
         return client;
+    }
+
+    private void applyProxyConfig(HttpClient.Builder builder) {
+        if (proxyConfig == null) {
+            return;
+        }
+
+        var proxyAddress = new InetSocketAddress(proxyConfig.getHost(), proxyConfig.getPort());
+        builder.proxy(ProxySelector.of(proxyAddress));
+
+        if (proxyConfig.hasCredentials()) {
+            var authenticator = new java.net.Authenticator() {
+                @Override
+                protected PasswordAuthentication getPasswordAuthentication() {
+                    return new PasswordAuthentication(
+                            proxyConfig.getUsername(),
+                            proxyConfig.getPassword().toCharArray());
+                }
+            };
+            builder.authenticator(authenticator);
+        }
     }
 
 }
